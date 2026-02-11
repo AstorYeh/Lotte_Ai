@@ -1,6 +1,6 @@
 [server]
-port = 8700
-headless = true
+# port = 8501 # Commented out to let Cloud decide
+# headless = true
 
 [browser]
 gatherUsageStats = false
