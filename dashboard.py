@@ -98,6 +98,7 @@ with st.sidebar:
     st.markdown(f"**系統時間**: {get_taiwan_datetime_str()}")
 
 # 載入預測資料
+@st.cache_data(ttl=300)
 def load_predictions():
     """載入最新預測"""
     predictions = {}
@@ -114,7 +115,10 @@ def load_predictions():
                     # 安全地解析 numbers字串
                     raw_numbers = latest.get('numbers', '[]')
                     try:
-                        numbers = eval(raw_numbers)
+                        if isinstance(raw_numbers, str):
+                            numbers = eval(raw_numbers)
+                        else:
+                            numbers = raw_numbers # Already a list/object
                     except:
                         numbers = []
                         
