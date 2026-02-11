@@ -20,6 +20,13 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# [CRITICAL UPDATE] 確保必要目錄存在 (Streamlit Cloud 部署需要)
+for dir_name in ['data', 'logs', 'predictions', 'config']:
+    Path(dir_name).mkdir(exist_ok=True)
+
+try:
+
+
 # 自定義 CSS
 st.markdown("""
 <style>
