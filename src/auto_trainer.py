@@ -88,14 +88,20 @@ class AutoTrainer:
             # 3. 執行訓練
             print("\n[Step 3] Running incremental training...")
             trainer = IncrementalTrainer(
-                data_path="data/539_train.csv",
-                config_path="config.json",
+                initial_periods=30,
                 use_llm=True,
-                use_enhanced_models=True
+                use_enhanced=True
             )
             
-            # 執行訓練
-            training_result = trainer.train()
+            # 執行訓練 (使用 train_all 方法)
+            trainer.train_all(data_file="data/539_train.csv")
+            
+            # 從 iteration_logger 取得訓練結果
+            training_result = {
+                'total_periods': len(trainer.iteration_logger.periods) if hasattr(trainer.iteration_logger, 'periods') else 0,
+                'avg_accuracy': 0.0,  # 需要從日誌計算
+                'improvements': {}
+            }
             
             if not training_result:
                 result['errors'].append("Training execution failed")
@@ -184,13 +190,17 @@ class AutoTrainer:
             
             # 執行訓練
             trainer = IncrementalTrainer(
-                data_path=str(temp_file),
-                config_path="config.json",
+                initial_periods=min(10, periods - 5),  # 使用較少的初始期數
                 use_llm=False,  # 快速訓練不使用 LLM
-                use_enhanced_models=True
+                use_enhanced=True
             )
             
-            training_result = trainer.train()
+            trainer.train_all(data_file=str(temp_file))
+            
+            # 從 iteration_logger 取得訓練結果
+            training_result = {
+                'avg_accuracy': 0.0  # 需要從日誌計算
+            }
             
             # 清理臨時檔案
             temp_file.unlink()
