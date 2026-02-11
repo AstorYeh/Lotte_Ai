@@ -1,2 +1,16 @@
-streamlit>=1.42.0
+requests
+beautifulsoup4
 pandas
+numpy
+scikit-learn
+google-generativeai
+matplotlib
+networkx
+python-dotenv
+streamlit>=1.42.0
+plotly
+seaborn
+apscheduler
+pillow
+tzdata
+altair<5
