@@ -1,129 +1,5 @@
 [
   {
-    "prediction_date": "2026-01-01 週四",
-    "predicted_numbers": [
-      8,
-      10,
-      16,
-      20,
-      21,
-      23,
-      31
-    ],
-    "created_at": "2026-01-29 21:06:12",
-    "status": "verified",
-    "actual_numbers": [
-      15,
-      16,
-      18,
-      29,
-      36
-    ],
-    "hits": [
-      16
-    ],
-    "accuracy": 0.2,
-    "backtest": {
-      "date": "2025-12-31 00:00:00",
-      "actual": [
-        28,
-        31,
-        32,
-        36,
-        39
-      ],
-      "predicted": [
-        5,
-        8,
-        12,
-        20,
-        25,
-        26,
-        32
-      ],
-      "hits": [
-        32
-      ],
-      "accuracy": 0.2
-    },
-    "verified_at": "2026-02-10 19:21:07"
-  },
-  {
-    "prediction_date": "2026-01-02 Friday",
-    "predicted_numbers": [
-      [
-        8,
-        9,
-        20,
-        24,
-        26
-      ],
-      [
-        8,
-        9,
-        20,
-        26,
-        32
-      ],
-      [
-        8,
-        20,
-        26,
-        28,
-        31
-      ],
-      [
-        5,
-        19,
-        20,
-        26,
-        38
-      ],
-      [
-        6,
-        14,
-        19,
-        30,
-        32
-      ]
-    ],
-    "created_at": "2026-02-10 19:22:31",
-    "status": "verified",
-    "actual_numbers": [
-      17,
-      18,
-      25,
-      36,
-      39
-    ],
-    "hits": [],
-    "accuracy": 0.0,
-    "backtest": {
-      "date": "2026-01-01 00:00:00",
-      "actual": [
-        15,
-        16,
-        18,
-        29,
-        36
-      ],
-      "predicted": [
-        8,
-        10,
-        16,
-        20,
-        21,
-        24,
-        32
-      ],
-      "hits": [
-        16
-      ],
-      "accuracy": 0.2
-    },
-    "verified_at": "2026-02-10 22:34:04"
-  },
-  {
     "prediction_date": "2026-02-11 Wednesday",
     "predicted_numbers": [
       [
@@ -141,28 +17,28 @@
         31
       ],
       [
-        6,
         10,
         12,
+        20,
         21,
         31
       ],
       [
+        7,
         10,
         12,
-        16,
         18,
         31
       ],
       [
+        8,
         10,
         12,
         26,
-        31,
         32
       ]
     ],
-    "created_at": "2026-02-10 22:34:15",
+    "created_at": "2026-02-11 18:26:54",
     "status": "pending",
     "actual_numbers": null,
     "hits": null,
