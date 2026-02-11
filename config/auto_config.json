@@ -1,0 +1,33 @@
+{
+  "discord": {
+    "webhook_url": "https://discord.com/api/webhooks/1470728453329522720/UWQtj1pfIol1xQQEbNWy2oDUkoQ5vf1kaQpT-wG9DMM_X6kgtkFjzqe08mLiW7OMSnf7",
+    "enable_notifications": true,
+    "notification_types": {
+      "prediction": true,
+      "verification": true,
+      "training": true,
+      "error": true
+    }
+  },
+  "schedule": {
+    "data_update_time": "23:00",
+    "verification_time": "23:05",
+    "training_time": "23:10",
+    "prediction_time": "23:15",
+    "training_frequency": "daily"
+  },
+  "training": {
+    "auto_trigger_threshold": 10,
+    "use_llm": true,
+    "use_enhanced_models": true
+  },
+  "retry": {
+    "max_attempts": 3,
+    "interval_minutes": 5
+  },
+  "logging": {
+    "enable_structured_logging": true,
+    "log_rotation_days": 7,
+    "discord_error_alert": true
+  }
+}

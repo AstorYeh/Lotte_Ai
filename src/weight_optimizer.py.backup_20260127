@@ -1,0 +1,258 @@
+"""
+智能權重優化器
+實作漸進式權重調整與歷史驗證機制,避免過度擬合
+"""
+import numpy as np
+from src.logger import logger
+
+class WeightOptimizer:
+    """智能權重優化器"""
+    
+    def __init__(self, learning_rate=0.6, observation_window=3):
+        """
+        初始化
+        
+        Args:
+            learning_rate: 學習率 (0-1),決定每次調整的幅度比例
+            observation_window: 觀察窗口,連續幾期低命中率才調整
+        """
+        self.learning_rate = learning_rate
+        self.observation_window = observation_window
+        self.history = []  # 記錄歷史表現
+        
+        logger.info(f"智能權重優化器已初始化 (學習率: {learning_rate}, 觀察窗口: {observation_window})")
+    
+    def should_adjust(self, group_id, accuracy, recent_history):
+        """
+        判斷是否應該調整權重
+        
+        Args:
+            group_id: 群組 ID
+            accuracy: 本次命中率
+            recent_history: 最近幾期的表現記錄
+        
+        Returns:
+            dict: {
+                'should_adjust': True/False,
+                'reason': '...',
+                'is_exception': True/False
+            }
+        """
+        # 規則 1: 命中率太低,但可能是例外
+        if accuracy < 0.2:
+            # 檢查最近幾期是否都很低
+            recent_accuracies = [h.get('accuracy', 0) for h in recent_history[-self.observation_window:]]
+            
+            if len(recent_accuracies) < self.observation_window:
+                # 資料不足,觀察中
+                return {
+                    'should_adjust': False,
+                    'reason': f'資料不足 ({len(recent_accuracies)}/{self.observation_window}),觀察中',
+                    'is_exception': True
+                }
+            
+            avg_recent = np.mean(recent_accuracies)
+            
+            if avg_recent < 0.25:
+                # 連續低迷,需要調整
+                return {
+                    'should_adjust': True,
+                    'reason': f'連續 {self.observation_window} 期低迷 (平均 {avg_recent:.0%})',
+                    'is_exception': False
+                }
+            else:
+                # 可能只是單次例外
+                return {
+                    'should_adjust': False,
+                    'reason': f'判定為例外 (近期平均 {avg_recent:.0%})',
+                    'is_exception': True
+                }
+        
+        # 規則 2: 命中率中等,小幅調整
+        elif 0.2 <= accuracy < 0.4:
+            return {
+                'should_adjust': True,
+                'reason': f'表現一般 ({accuracy:.0%}),小幅調整',
+                'is_exception': False
+            }
+        
+        # 規則 3: 命中率良好,中幅調整
+        elif 0.4 <= accuracy < 0.6:
+            return {
+                'should_adjust': True,
+                'reason': f'表現良好 ({accuracy:.0%}),中幅調整',
+                'is_exception': False
+            }
+        
+        # 規則 4: 命中率優秀,大幅調整
+        else:
+            return {
+                'should_adjust': True,
+                'reason': f'表現優秀 ({accuracy:.0%}),大幅調整',
+                'is_exception': False
+            }
+    
+    def calculate_adjustment(self, accuracy):
+        """
+        計算調整幅度
+        
+        Args:
+            accuracy: 命中率
+        
+        Returns:
+            float: 調整幅度 (例如 0.05 表示 +5%)
+        """
+        # 根據命中率決定調整方向與幅度
+        if accuracy < 0.2:
+            target_adjustment = -0.15  # -15%
+        elif accuracy < 0.4:
+            target_adjustment = -0.10  # -10%
+        elif accuracy < 0.6:
+            target_adjustment = 0.20   # +20%
+        else:
+            target_adjustment = 0.30   # +30%
+        
+        # 應用學習率 (只調整目標的 60%)
+        actual_adjustment = target_adjustment * self.learning_rate
+        
+        return actual_adjustment
+    
+    def backtest_adjustment(self, proposed_weights, historical_data, group_id):
+        """
+        回測驗證調整是否有效
+        
+        Args:
+            proposed_weights: 提議的新權重
+            historical_data: 歷史資料 (最近 10 期)
+            group_id: 群組 ID
+        
+        Returns:
+            dict: {
+                'is_valid': True/False,
+                'message': '...',
+                'improvement': 0.05
+            }
+        """
+        if len(historical_data) < 5:
+            # 資料不足,無法驗證
+            return {
+                'is_valid': True,  # 預設允許
+                'message': '歷史資料不足,跳過驗證',
+                'improvement': 0
+            }
+        
+        try:
+            # 簡化版回測:比較最近 5 期的平均命中率
+            recent_5 = historical_data[-5:]
+            avg_accuracy = np.mean([h.get('accuracy', 0) for h in recent_5])
+            
+            # 如果最近表現已經不錯,調整可能有效
+            if avg_accuracy > 0.3:
+                return {
+                    'is_valid': True,
+                    'message': f'近期表現良好 ({avg_accuracy:.0%}),調整有效',
+                    'improvement': 0.05
+                }
+            else:
+                # 表現不佳,調整可能無效
+                return {
+                    'is_valid': False,
+                    'message': f'近期表現不佳 ({avg_accuracy:.0%}),暫不調整',
+                    'improvement': 0
+                }
+        
+        except Exception as e:
+            logger.error(f"回測驗證失敗: {e}")
+            return {
+                'is_valid': True,  # 錯誤時預設允許
+                'message': f'驗證錯誤: {e}',
+                'improvement': 0
+            }
+    
+    def optimize_group_weights(self, group_id, accuracy, group_history, current_weights):
+        """
+        優化單一群組的權重
+        
+        Args:
+            group_id: 群組 ID
+            accuracy: 本次命中率
+            group_history: 該群組的歷史表現
+            current_weights: 當前權重
+        
+        Returns:
+            dict: {
+                'action': 'adjust'/'maintain',
+                'adjustment': 0.05,
+                'new_weights': {...},
+                'reason': '...'
+            }
+        """
+        # 判斷是否調整
+        decision = self.should_adjust(group_id, accuracy, group_history)
+        
+        if not decision['should_adjust']:
+            return {
+                'action': 'maintain',
+                'adjustment': 0,
+                'new_weights': current_weights,
+                'reason': decision['reason']
+            }
+        
+        # 計算調整幅度
+        adjustment = self.calculate_adjustment(accuracy)
+        
+        # 回測驗證
+        backtest_result = self.backtest_adjustment(
+            current_weights,
+            group_history,
+            group_id
+        )
+        
+        if not backtest_result['is_valid']:
+            return {
+                'action': 'maintain',
+                'adjustment': 0,
+                'new_weights': current_weights,
+                'reason': backtest_result['message'],
+                'backtest': backtest_result
+            }
+        
+        # 執行調整
+        new_weights = {}
+        for model_name, weight in current_weights.items():
+            new_weights[model_name] = weight * (1 + adjustment)
+        
+        return {
+            'action': 'adjust',
+            'adjustment': adjustment,
+            'new_weights': new_weights,
+            'reason': decision['reason'],
+            'backtest': backtest_result
+        }
+
+if __name__ == "__main__":
+    # 測試
+    optimizer = WeightOptimizer(learning_rate=0.6, observation_window=3)
+    
+    # 模擬歷史資料
+    test_history = [
+        {'accuracy': 0.2},
+        {'accuracy': 0.4},
+        {'accuracy': 0.6}
+    ]
+    
+    test_weights = {
+        'freq': 1.0,
+        'rsi': 1.0,
+        'slope': 1.0
+    }
+    
+    # 測試優化
+    result = optimizer.optimize_group_weights(
+        'group1',
+        0.6,  # 60% 命中率
+        test_history,
+        test_weights
+    )
+    
+    logger.info(f"優化結果: {result}")

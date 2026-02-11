@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  lottery-predictor:
+    build: .
+    container_name: 539-ai-predictor
+    restart: unless-stopped
+    volumes:
+      # 持久化資料
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./config:/app/config
+      - ./predictions:/app/predictions
+    environment:
+      - TZ=Asia/Taipei
+      - PYTHONUNBUFFERED=1
+    networks:
+      - lottery-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  lottery-network:
+    driver: bridge

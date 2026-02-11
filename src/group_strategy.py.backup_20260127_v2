@@ -1,0 +1,258 @@
+"""
+四群分區策略引擎
+將 1-39 號碼分為四群,各自獨立分析後再跨群篩選
+"""
+import numpy as np
+import pandas as pd
+from src.models import FeatureEngine
+from src.logger import logger
+
+class GroupBasedStrategy:
+    """四群分區策略引擎"""
+    
+    # 定義四個群組
+    GROUPS = {
+        'group1': (1, 10),
+        'group2': (11, 20),
+        'group3': (21, 30),
+        'group4': (31, 39)
+    }
+    
+    def __init__(self):
+        # 初始化各群組的模型權重 (優化後)
+        self.group_weights = {
+            'group1': {
+                'freq': 1.2, 'rsi': 0.8, 'slope': 1.0, 'knn': 0.9,
+                'svm': 1.1, 'markov': 1.3, 'pca': 0.7,
+                'xgboost': 1.5, 'random_forest': 1.4, 'llm': 0.5
+            },
+            'group2': {
+                'freq': 1.2, 'rsi': 0.8, 'slope': 1.0, 'knn': 0.9,
+                'svm': 1.1, 'markov': 1.3, 'pca': 0.7,
+                'xgboost': 1.5, 'random_forest': 1.4, 'llm': 0.5
+            },
+            'group3': {
+                'freq': 1.2, 'rsi': 0.8, 'slope': 1.0, 'knn': 0.9,
+                'svm': 1.1, 'markov': 1.3, 'pca': 0.7,
+                'xgboost': 1.5, 'random_forest': 1.4, 'llm': 0.5
+            },
+            'group4': {
+                'freq': 1.2, 'rsi': 0.8, 'slope': 1.0, 'knn': 0.9,
+                'svm': 1.1, 'markov': 1.3, 'pca': 0.7,
+                'xgboost': 1.5, 'random_forest': 1.4, 'llm': 0.5
+            }
+        }
+        
+        logger.info("四群分區策略引擎已初始化")
+        logger.info(f"群組定義: {self.GROUPS}")
+    
+    def analyze_group(self, feature_engine, group_id, llm_advice=None, use_enhanced=False):
+        """
+        分析單一群組,選出 0-3 顆號碼
+        
+        Args:
+            feature_engine: 特徵引擎 (已計算好所有模型評分)
+            group_id: 群組 ID (group1-4)
+            llm_advice: LLM 建議 (可選)
+            use_enhanced: 是否使用增強模型
+        
+        Returns:
+            dict: {
+                'selected_numbers': [5, 8],
+                'scores': {5: 0.88, 8: 0.75, ...},
+                'model_scores': {'freq': {...}, 'rsi': {...}, ...}
+            }
+        """
+        group_range = self.GROUPS[group_id]
+        group_numbers = list(range(group_range[0], group_range[1] + 1))
+        
+        # 取得該群組的所有模型評分
+        all_scores = feature_engine.get_all_scores(use_enhanced=use_enhanced)
+        
+        # 篩選出該群組的號碼
+        group_scores = all_scores.loc[all_scores.index.isin(group_numbers)]
+        
+        # 計算各模型的加權評分
+        model_scores = {}
+        model_names = ['freq', 'rsi', 'slope', 'knn', 'svm', 'markov', 'pca']
+        
+        # 如果使用增強模型,加入新模型
+        if use_enhanced and 'xgboost' in all_scores.columns:
+            model_names.extend(['xgboost', 'random_forest'])
+        
+        for model_name in model_names:
+            if model_name in group_scores.columns:
+                model_scores[model_name] = group_scores[model_name].to_dict()
+        
+        # 計算綜合評分
+        weighted_scores = self._calculate_weighted_scores(
+            group_scores, 
+            self.group_weights[group_id],
+            llm_advice,
+            model_names
+        )
+        
+        # 選出 0-3 顆號碼 (動態選擇)
+        selected_numbers = self._select_top_numbers(weighted_scores, max_count=3)
+        
+        return {
+            'selected_numbers': selected_numbers,
+            'scores': weighted_scores,
+            'model_scores': model_scores
+        }
+    
+    def _calculate_weighted_scores(self, scores_df, weights, llm_advice=None, model_names=None):
+        """計算加權綜合評分"""
+        if model_names is None:
+            model_names = ['freq', 'rsi', 'slope', 'knn', 'svm', 'markov', 'pca']
+        
+        weighted = pd.Series(0.0, index=scores_df.index)
+        total_weight = 0
+        
+        # 模型加權
+        for model_name in model_names:
+            if model_name == 'llm':
+                continue  # LLM 單獨處理
+            
+            weight = weights.get(model_name, 1.0)  # 如果權重不存在,使用預設值 1.0
+            
+            if model_name in scores_df.columns:
+                weighted += scores_df[model_name] * weight
+                total_weight += weight
+        
+        # 正規化
+        if total_weight > 0:
+            weighted = weighted / total_weight
+        
+        # 加入 LLM 建議 (如果有)
+        if llm_advice and 'numbers' in llm_advice:
+            llm_weight = weights.get('llm', 0.5)
+            llm_confidence = llm_advice.get('confidence', 0.5)
+            
+            for num in llm_advice['numbers']:
+                if num in weighted.index:
+                    # LLM 建議的號碼加分
+                    weighted[num] += llm_weight * llm_confidence
+        
+        return weighted.to_dict()
+    
+    def _select_top_numbers(self, scores, max_count=3, threshold=0.45, min_count=1):  # 🔥 0.6 → 0.45
+        """
+        動態選擇號碼 (1-3 顆) - 確保至少選出 min_count 顆
+        
+        Args:
+            scores: 評分字典 {num: score}
+            max_count: 最多選幾顆
+            threshold: 最低分數閾值 (已從 0.6 降至 0.45)
+            min_count: 最少選幾顆 (新增參數,預設 1)
+        
+        Returns:
+            list: 選出的號碼
+        """
+        # 排序
+        sorted_numbers = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+        
+        # 選出高於閾值且不超過 max_count 的號碼
+        selected = []
+        for num, score in sorted_numbers:
+            if score >= threshold and len(selected) < max_count:
+                selected.append(num)
+        
+        # 🔥 強化修補 3: 確保至少選出 min_count 顆,避免群組空白
+        if len(selected) < min_count and sorted_numbers:
+            # 如果沒有達到最小數量,選擇評分最高的號碼
+            for num, score in sorted_numbers:
+                if num not in selected:
+                    selected.append(num)
+                    if len(selected) >= min_count:
+                        break
+        
+        return sorted(selected)
+    
+    def cross_group_selection(self, group_results, target_count=(6, 9)):
+        """
+        跨群篩選,從各群候選號碼中選出最終 6-9 顆
+        
+        Args:
+            group_results: 各群分析結果
+            target_count: 目標數量範圍 (min, max)
+        
+        Returns:
+            dict: {
+                'final_selection': [5, 8, 15, ...],
+                'selection_scores': {5: 0.88, ...}
+            }
+        """
+        # 收集所有候選號碼與評分
+        all_candidates = {}
+        
+        for group_id, result in group_results.items():
+            for num in result['selected_numbers']:
+                all_candidates[num] = result['scores'][num]
+        
+        # 排序
+        sorted_candidates = sorted(all_candidates.items(), key=lambda x: x[1], reverse=True)
+        
+        # 選出 target_count 範圍內的號碼
+        min_count, max_count = target_count
+        
+        # 至少選 min_count 顆
+        final_selection = [num for num, score in sorted_candidates[:max_count]]
+        
+        # 如果候選數量不足,至少選到 min_count
+        if len(final_selection) < min_count:
+            # 從剩餘號碼中補足
+            remaining = set(range(1, 40)) - set(final_selection)
+            # 這裡可以用其他策略補足,暫時先隨機
+            import random
+            additional = random.sample(list(remaining), min_count - len(final_selection))
+            final_selection.extend(additional)
+        
+        return {
+            'final_selection': sorted(final_selection),
+            'selection_scores': {num: all_candidates.get(num, 0) for num in final_selection}
+        }
+    
+    def update_group_weights(self, group_id, adjustment):
+        """
+        更新群組權重
+        
+        Args:
+            group_id: 群組 ID
+            adjustment: 調整幅度 (例如 0.05 表示 +5%)
+        """
+        if group_id not in self.group_weights:
+            logger.warning(f"群組 {group_id} 不存在")
+            return
+        
+        # 對所有模型權重進行調整
+        for model_name in self.group_weights[group_id]:
+            self.group_weights[group_id][model_name] *= (1 + adjustment)
+        
+        logger.info(f"{group_id} 權重已調整 {adjustment:+.0%}")
+
+if __name__ == "__main__":
+    # 測試
+    from src.models import FeatureEngine
+    
+    logger.section("測試四群分區策略")
+    
+    # 建立特徵引擎
+    eng = FeatureEngine()
+    scores = eng.get_all_scores()
+    
+    # 建立策略引擎
+    strategy = GroupBasedStrategy()
+    
+    # 測試各群分析
+    group_results = {}
+    for group_id in strategy.GROUPS.keys():
+        result = strategy.analyze_group(eng, group_id)
+        group_results[group_id] = result
+        
+        logger.info(f"\n{group_id} 結果:")
+        logger.info(f"  選出號碼: {result['selected_numbers']}")
+    
+    # 測試跨群篩選
+    final_result = strategy.cross_group_selection(group_results)
+    logger.info(f"\n最終選出: {final_result['final_selection']}")

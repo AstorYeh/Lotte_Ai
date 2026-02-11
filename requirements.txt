@@ -1,0 +1,16 @@
+requests
+beautifulsoup4
+pandas
+numpy
+scikit-learn
+google-generativeai
+matplotlib
+networkx
+python-dotenv
+streamlit
+plotly
+seaborn
+apscheduler
+discord-webhook
+pillow
+kaleido
