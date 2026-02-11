@@ -148,6 +148,30 @@ def load_history(game):
 
 # ... (UI code continues)
 
+# 首頁內容
+if page == "🏠 首頁":
+    st.markdown("### 👋 歡迎使用全方位預測系統")
+    st.info("請從左側選單選擇功能")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("""
+        #### 🎯 支援遊戲
+        - **今彩539**: 每日開獎 (週一至週六)
+        - **大樂透**: 每週二、五開獎
+        - **威力彩**: 每週一、四開獎
+        - **3星/4星彩**: 每日開獎
+        """)
+    
+    with col2:
+        st.markdown("""
+        #### 🤖 系統特色
+        - **自動化**: 每日自動抓取、訓練、預測
+        - **AI 模型**: 結合 XGBoost 與深度學習
+        - **多時區**: 完整支援台灣時區 (UTC+8)
+        - **跨平台**: 支援網頁與 Discord 通知
+        """)
+
 # 最新預測頁面
 elif page == "🎲 最新預測":
     st.markdown("## 最新預測號碼")
