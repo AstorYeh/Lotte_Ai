@@ -1,0 +1,2 @@
+﻿prediction_date,predicted_numbers,actual_numbers,hits,accuracy,verified,created_at,strategy,confidence,verified_at
+2026-02-13,"5,12,18,25,33","5,12,20,28,35",2.0,0.4,True,2026-02-12T21:08:34.588327+08:00,ensemble,0.75,2026-02-12T21:16:57.002885+08:00
