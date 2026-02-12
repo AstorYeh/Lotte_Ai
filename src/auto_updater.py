@@ -405,6 +405,11 @@ class AutoUpdater:
             # Send Discord Notification
             if result['new_records'] > 0:
                 self.discord.send_update_report(result['updated_stats'])
+            
+            # 提取並發送當日開獎號碼
+            today_results = self._get_today_results()
+            if today_results:
+                self.discord.send_today_results(today_results)
         else:
             print(f"\n[WARNING] Errors occurred: {result['errors']}")
             
@@ -416,6 +421,83 @@ class AutoUpdater:
         )
         
         return result
+    
+    def _get_today_results(self) -> Dict[str, Dict]:
+        """提取當日開獎號碼"""
+        import pandas as pd
+        from src.timezone_utils import get_taiwan_now
+        
+        today = get_taiwan_now().strftime('%Y-%m-%d')
+        results = {}
+        
+        # 539
+        try:
+            df_539 = pd.read_csv(self.paths['539'])
+            today_539 = df_539[df_539['date'] == today]
+            if not today_539.empty:
+                row = today_539.iloc[0]
+                results['539'] = {
+                    'date': row['date'],
+                    'numbers': [int(row[f'n{i}']) for i in range(1, 6)]
+                }
+        except:
+            pass
+        
+        # Power
+        try:
+            df_power = pd.read_csv(self.paths['power'])
+            today_power = df_power[df_power['date'] == today]
+            if not today_power.empty:
+                row = today_power.iloc[0]
+                results['power'] = {
+                    'date': row['date'],
+                    'numbers': [int(row[f'n{i}']) for i in range(1, 7)],
+                    'special': str(int(row['special'])).zfill(2)
+                }
+        except:
+            pass
+        
+        # Lotto
+        try:
+            df_lotto = pd.read_csv(self.paths['lotto'])
+            today_lotto = df_lotto[df_lotto['date'] == today]
+            if not today_lotto.empty:
+                row = today_lotto.iloc[0]
+                results['lotto'] = {
+                    'date': row['date'],
+                    'numbers': [int(row[f'n{i}']) for i in range(1, 7)],
+                    'special': str(int(row['special'])).zfill(2)
+                }
+        except:
+            pass
+        
+        # Star3
+        try:
+            df_star3 = pd.read_csv(self.paths['star3'])
+            today_star3 = df_star3[df_star3['date'] == today]
+            if not today_star3.empty:
+                row = today_star3.iloc[0]
+                results['star3'] = {
+                    'date': row['date'],
+                    'numbers': [row['n1'], row['n2'], row['n3']]
+                }
+        except:
+            pass
+        
+        # Star4
+        try:
+            df_star4 = pd.read_csv(self.paths['star4'])
+            today_star4 = df_star4[df_star4['date'] == today]
+            if not today_star4.empty:
+                row = today_star4.iloc[0]
+                results['star4'] = {
+                    'date': row['date'],
+                    'numbers': [row['n1'], row['n2'], row['n3'], row['n4']]
+                }
+        except:
+            pass
+        
+        return results
 
 if __name__ == "__main__":
     updater = AutoUpdater()

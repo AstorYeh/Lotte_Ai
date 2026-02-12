@@ -323,6 +323,89 @@ class DiscordNotifier:
         
         return self._send_webhook(payload)
     
+    def send_today_results(self, today_results: Dict[str, Dict]):
+        """
+        發送當日開獎號碼
+        
+        Args:
+            today_results: {遊戲: {date, numbers}}
+        """
+        if not self.enabled:
+            return False
+        
+        embed = {
+            "title": "🎯 今日開獎號碼",
+            "color": 0x00FF00,  # 綠色
+            "timestamp": get_taiwan_isoformat(),
+            "fields": []
+        }
+        
+        # 539
+        if '539' in today_results and today_results['539']:
+            result_539 = today_results['539']
+            numbers_str = ', '.join(map(str, result_539['numbers']))
+            embed["fields"].append({
+                "name": "🎲 今彩539",
+                "value": f"📅 {result_539['date']}\n🔢 {numbers_str}",
+                "inline": False
+            })
+        
+        # Power
+        if 'power' in today_results and today_results['power']:
+            result_power = today_results['power']
+            main_nums = ', '.join(map(str, result_power['numbers']))
+            special = result_power.get('special', '')
+            embed["fields"].append({
+                "name": "⚡ 威力彩",
+                "value": f"📅 {result_power['date']}\n🔢 {main_nums}\n🌟 特別號: {special}",
+                "inline": False
+            })
+        
+        # Lotto
+        if 'lotto' in today_results and today_results['lotto']:
+            result_lotto = today_results['lotto']
+            main_nums = ', '.join(map(str, result_lotto['numbers']))
+            special = result_lotto.get('special', '')
+            embed["fields"].append({
+                "name": "🎰 大樂透",
+                "value": f"📅 {result_lotto['date']}\n🔢 {main_nums}\n🌟 特別號: {special}",
+                "inline": False
+            })
+        
+        # Star3
+        if 'star3' in today_results and today_results['star3']:
+            result_star3 = today_results['star3']
+            numbers_str = ''.join(map(str, result_star3['numbers']))
+            embed["fields"].append({
+                "name": "⭐ 3星彩",
+                "value": f"📅 {result_star3['date']}\n🔢 {numbers_str}",
+                "inline": True
+            })
+        
+        # Star4
+        if 'star4' in today_results and today_results['star4']:
+            result_star4 = today_results['star4']
+            numbers_str = ''.join(map(str, result_star4['numbers']))
+            embed["fields"].append({
+                "name": "🌟 4星彩",
+                "value": f"📅 {result_star4['date']}\n🔢 {numbers_str}",
+                "inline": True
+            })
+        
+        if not embed["fields"]:
+            return False
+        
+        embed["footer"] = {
+            "text": "539 AI 預測大師 | 開獎結果"
+        }
+        
+        payload = {
+            "username": "開獎通知",
+            "embeds": [embed]
+        }
+        
+        return self._send_webhook(payload)
+    
     def send_error_alert(
         self,
         error_type: str,
