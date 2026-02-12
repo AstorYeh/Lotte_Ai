@@ -59,7 +59,7 @@ class AutoTrainer:
         # 例如: 檢查是否有足夠的新驗證資料
         return True
     
-    def run_full_training(self) -> Optional[Dict]:
+    def run_full_training(self, verification_results: Optional[Dict] = None) -> Optional[Dict]:
         """執行完整訓練流程"""
         print("=" * 60)
         print("Auto Training Starting...")
@@ -70,10 +70,20 @@ class AutoTrainer:
             'training_periods': 0,
             'avg_accuracy': 0.0,
             'improvements': {},
-            'errors': []
+            'errors': [],
+            'strategy_adjusted': False
         }
         
         try:
+            # 0. 檢查是否需要策略調整 (基於驗證結果)
+            if verification_results:
+                print("\n[Step 0] Checking if strategy adjustment needed...")
+                for game, vr in verification_results.items():
+                    if vr.get('status') == 'verified':
+                        # 簡化版:如果有驗證結果,記錄但不立即調整
+                        # 完整版需要實作 should_adjust_strategy 方法
+                        print(f"  {game}: {vr.get('verified', 0)} predictions verified")
+            
             # 1. 備份權重配置
             print("\n[Step 1] Backing up weight configuration...")
             self._backup_config()

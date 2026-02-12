@@ -9,6 +9,10 @@ from src.games.power_predictor import PowerPredictor
 from src.games.star3_predictor import Star3Predictor
 from src.games.star4_predictor import Star4Predictor
 from src.discord_notifier import DiscordNotifier
+from src.prediction_manager import prediction_manager
+import pandas as pd
+from datetime import datetime, timedelta
+from src.timezone_utils import get_taiwan_now
 
 
 class MultiGameManager:
@@ -227,6 +231,144 @@ class MultiGameManager:
         
         payload = {
             "username": f"{game_names.get(game_name)} AI 預測",
+            "embeds": [embed]
+        }
+        
+        self.discord._send_webhook(payload)
+    
+    def check_data_sync(self, game: str) -> dict:
+        """檢查資料是否已同步"""
+        try:
+            history_file = f"data/{game}_history.csv"
+            from pathlib import Path
+            if not Path(history_file).exists():
+                return {'synced': False, 'reason': 'file_not_found'}
+            
+            df = pd.read_csv(history_file)
+            if df.empty:
+                return {'synced': False, 'reason': 'empty_file'}
+            
+            # 取得最新日期
+            latest_date = pd.to_datetime(df.iloc[-1]['date'])
+            
+            # 計算預期的最新日期 (昨日)
+            expected_date = get_taiwan_now() - timedelta(days=1)
+            
+            # 檢查是否已同步
+            is_synced = latest_date.date() >= expected_date.date()
+            
+            return {
+                'synced': is_synced,
+                'latest_date': str(latest_date.date()),
+                'expected_date': str(expected_date.date())
+            }
+        except Exception as e:
+            return {'synced': False, 'error': str(e)}
+    
+    def verify_all_predictions(self) -> dict:
+        """驗證所有遊戲的待驗證預測"""
+        print("\n[Verification] Starting prediction verification...")
+        results = {}
+        
+        for game in ['539', 'lotto', 'power', 'star3', 'star4']:
+            # 1. 檢查資料同步狀態
+            sync_status = self.check_data_sync(game)
+            if not sync_status.get('synced', False):
+                print(f"[WARNING] {game} data not synced, skipping verification")
+                results[game] = {
+                    'status': 'skipped',
+                    'reason': 'data_not_synced',
+                    'sync_info': sync_status
+                }
+                continue
+            
+            # 2. 取得待驗證預測
+            pending = prediction_manager.get_pending_predictions(game, days=7)
+            if pending.empty:
+                results[game] = {'status': 'no_pending', 'verified': 0}
+                continue
+            
+            # 3. 讀取實際開獎號碼並驗證
+            verified_count = 0
+            for _, pred_row in pending.iterrows():
+                pred_date = str(pred_row['prediction_date'].date())
+                
+                # 從歷史資料中找到對應日期的開獎號碼
+                actual_numbers = self._get_actual_numbers(game, pred_date)
+                if actual_numbers:
+                    prediction_manager.update_verification(game, pred_date, actual_numbers)
+                    verified_count += 1
+            
+            results[game] = {
+                'status': 'verified',
+                'verified': verified_count,
+                'pending': len(pending)
+            }
+        
+        return results
+    
+    def _get_actual_numbers(self, game: str, date: str) -> list:
+        """從歷史資料中取得實際開獎號碼"""
+        try:
+            history_file = f"data/{game}_history.csv"
+            df = pd.read_csv(history_file)
+            
+            # 找到對應日期
+            row = df[df['date'] == date]
+            if row.empty:
+                return None
+            
+            # 提取號碼
+            row = row.iloc[0]
+            numbers = []
+            
+            # 根據不同遊戲提取號碼
+            if game in ['539', 'lotto']:
+                for col in ['1', '2', '3', '4', '5', '6']:
+                    if col in row:
+                        numbers.append(int(row[col]))
+            elif game == 'power':
+                for col in ['1', '2', '3', '4', '5', '6']:
+                    if col in row:
+                        numbers.append(int(row[col]))
+            elif game in ['star3', 'star4']:
+                if 'number' in row:
+                    numbers = [int(d) for d in str(row['number'])]
+            
+            return numbers if numbers else None
+            
+        except Exception as e:
+            print(f"[ERROR] Failed to get actual numbers for {game} on {date}: {e}")
+            return None
+    
+    def send_verification_summary(self, results: dict):
+        """發送驗證摘要到 Discord"""
+        total_verified = sum(r.get('verified', 0) for r in results.values())
+        
+        embed = {
+            "title": "📊 預測驗證報告",
+            "description": f"已驗證 {total_verified} 筆預測",
+            "color": 0x3498DB,
+            "fields": [],
+            "timestamp": __import__('src.timezone_utils', fromlist=['get_taiwan_isoformat']).get_taiwan_isoformat()
+        }
+        
+        for game, result in results.items():
+            status_emoji = {'verified': '✅', 'skipped': '⏭️', 'no_pending': '➖'}
+            emoji = status_emoji.get(result.get('status'), '❓')
+            
+            value = f"{emoji} {result.get('status', 'unknown')}"
+            if result.get('verified'):
+                value += f" ({result['verified']} 筆)"
+            
+            embed['fields'].append({
+                "name": game.upper(),
+                "value": value,
+                "inline": True
+            })
+        
+        payload = {
+            "username": "預測驗證系統",
             "embeds": [embed]
         }
         

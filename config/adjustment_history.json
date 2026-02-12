@@ -1,0 +1,37 @@
+{
+  "539": {
+    "last_adjustment_date": null,
+    "last_adjustment_period": null,
+    "periods_since_last": 0,
+    "recent_configs": [],
+    "loop_count": 0
+  },
+  "lotto": {
+    "last_adjustment_date": null,
+    "last_adjustment_period": null,
+    "periods_since_last": 0,
+    "recent_configs": [],
+    "loop_count": 0
+  },
+  "power": {
+    "last_adjustment_date": null,
+    "last_adjustment_period": null,
+    "periods_since_last": 0,
+    "recent_configs": [],
+    "loop_count": 0
+  },
+  "star3": {
+    "last_adjustment_date": null,
+    "last_adjustment_period": null,
+    "periods_since_last": 0,
+    "recent_configs": [],
+    "loop_count": 0
+  },
+  "star4": {
+    "last_adjustment_date": null,
+    "last_adjustment_period": null,
+    "periods_since_last": 0,
+    "recent_configs": [],
+    "loop_count": 0
+  }
+}

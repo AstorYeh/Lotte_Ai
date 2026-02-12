@@ -164,23 +164,62 @@ class AutoScheduler:
         updater.update_and_validate()
     
     def _run_verification(self):
-        """執行預測驗證"""
-        # 驗證通常在資料更新後自動進行 (AutoUpdater 會更新 history)，
-        # 但我們也可以明確呼叫 prediction_history 的驗證
-        from src.prediction_history import prediction_history
-        # 這裡需要傳入當期開獎號碼，或者讓 history 自己去對帳?
-        # 目前架構: prediction_history.update_actual_result 需要明確號碼
-        # AutoUpdater 已經更新了 history.csv
-        # 我們可以寫一個簡單的驗證腳本
-        pass # 暫時由 AutoUpdater 的 Log 覆蓋，或後續實作自動對帳邏輯
+        """執行預測驗證 (所有遊戲)"""
+        from src.multi_game_manager import MultiGameManager
+        print("\n[Scheduler] Starting Prediction Verification...")
+        manager = MultiGameManager()
+        results = manager.verify_all_predictions()
+        
+        # 儲存驗證結果供訓練流程使用
+        self.last_verification_results = results
+        
+        # 發送驗證報告到 Discord
+        if results:
+            manager.send_verification_summary(results)
+        
+        return results
 
     def _run_training(self):
-        """執行自動訓練"""
+        """執行自動訓練 (使用驗證結果)"""
         from src.auto_trainer import AutoTrainer
         print("\n[Scheduler] Starting Auto Training...")
         trainer = AutoTrainer()
-        trainer.run_full_training()
+        
+        # 傳遞驗證結果給訓練流程
+        verification_results = getattr(self, 'last_verification_results', None)
+        trainer.run_full_training(verification_results=verification_results)
 
+    def _run_math_validation(self):
+        """執行數學專家驗證"""
+        from src.ai_advisors.math_validator import MathValidator
+        print("\n[Scheduler] Starting Math Validation...")
+        validator = MathValidator()
+        results = validator.run_daily_validation()
+        return results
+    
+    def _run_numerology_advice(self):
+        """執行命理專家建議"""
+        from src.ai_advisors.numerology_advisor import NumerologyAdvisor
+        from datetime import date
+        print("\n[Scheduler] Getting Numerology Advice...")
+        advisor = NumerologyAdvisor()
+        today = date.today().strftime('%Y-%m-%d')
+        advice = advisor.get_daily_numerology_advice(today)
+        advisor.send_daily_numerology_report(today, advice)
+        return advice
+    
+    def _run_digital_twin_review(self):
+        """執行 AI 分身審查"""
+        from src.ai_advisors.digital_twin import DigitalTwinAdvisor
+        print("\n[Scheduler] Starting Digital Twin Review...")
+        twin = DigitalTwinAdvisor()
+        context = {
+            'verification_results': getattr(self, 'last_verification_results', {}),
+            'timestamp': __import__('src.timezone_utils', fromlist=['get_taiwan_isoformat']).get_taiwan_isoformat()
+        }
+        review = twin.daily_strategic_review(context)
+        return review
+    
     def _run_prediction(self):
         """執行新預測生成與推送"""
         from src.multi_game_manager import MultiGameManager

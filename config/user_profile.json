@@ -1,0 +1,24 @@
+{
+    "decision_style": "analytical",
+    "risk_tolerance": "moderate",
+    "priority": "long_term_stability",
+    "learning_from_history": true,
+    "preferences": {
+        "trust_data_over_intuition": true,
+        "prefer_gradual_changes": true,
+        "value_multiple_perspectives": true,
+        "avoid_overreaction": true,
+        "seek_root_causes": true
+    },
+    "thinking_patterns": {
+        "always_ask_why": true,
+        "consider_second_order_effects": true,
+        "look_for_patterns": true,
+        "question_assumptions": true
+    },
+    "communication_style": {
+        "direct_and_honest": true,
+        "data_driven": true,
+        "solution_oriented": true
+    }
+}

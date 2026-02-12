@@ -6,20 +6,53 @@
       "prediction": true,
       "verification": true,
       "training": true,
-      "error": true
+      "error": true,
+      "ai_advisors": true
     }
   },
   "schedule": {
     "data_update_time": "23:00",
+    "math_validation_time": "23:02",
     "verification_time": "23:05",
     "training_time": "23:10",
+    "numerology_advice_time": "23:14",
     "prediction_time": "23:15",
+    "digital_twin_review_time": "23:16",
     "training_frequency": "daily"
+  },
+  "ai_advisors": {
+    "strategy_reviewer": {
+      "enabled": true,
+      "schedule": "weekly",
+      "day": "sunday",
+      "time": "22:00"
+    },
+    "math_validator": {
+      "enabled": true,
+      "schedule": "daily",
+      "time": "23:02",
+      "stop_on_error": false
+    },
+    "numerology_advisor": {
+      "enabled": true,
+      "schedule": "daily",
+      "time": "23:14",
+      "integration_weight": 0.15
+    },
+    "digital_twin": {
+      "enabled": true,
+      "schedule": "daily",
+      "time": "23:16",
+      "alert_on_concern": true,
+      "veto_power": false
+    }
   },
   "training": {
     "auto_trigger_threshold": 10,
     "use_llm": true,
-    "use_enhanced_models": true
+    "use_enhanced_models": true,
+    "adjustment_frequency_periods": 3,
+    "enable_loop_detection": true
   },
   "retry": {
     "max_attempts": 3,
