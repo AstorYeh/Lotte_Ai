@@ -1,0 +1,42 @@
+name: Daily Training (Optional)
+
+# 這個 workflow 是可選的,可以在 GitHub 上執行訓練
+# 如果您想在本機訓練,請使用 auto_train_and_push.py
+
+on:
+  # 手動觸發
+  workflow_dispatch:
+  
+  # 每天 UTC 15:00 (台灣時間 23:00) - 可選
+  # schedule:
+  #   - cron: '0 15 * * *'
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        
+    - name: Run training
+      env:
+        GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+      run: |
+        python -c "from src.auto_trainer import AutoTrainer; t = AutoTrainer(); t.run_full_training()"
+        
+    - name: Commit and push if changed
+      run: |
+        git config --global user.name 'GitHub Actions'
+        git config --global user.email 'actions@github.com'
+        git add config.json logs/iterations/
+        git diff --quiet && git diff --staged --quiet || (git commit -m "chore: 自動訓練更新 (GitHub Actions)" && git push)
