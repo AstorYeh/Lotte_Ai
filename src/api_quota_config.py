@@ -19,12 +19,12 @@ API_QUOTA_CONFIG = {
     # 請求延遲 (秒)
     'request_delay': 5,  # 每次請求間隔5秒,避免超過 RPM
     
-    # 每日請求限制
-    'daily_limit': 100,  # 保守設定,避免超過 RPD
+    # 每日請求限制 (此專案僅用 40% 配額)
+    'daily_limit': 40,  # 40% 配額,其他專案使用 60%
     
     # Token 優化
-    'max_output_tokens': 500,  # 限制輸出長度
-    'temperature': 0.3,  # 降低隨機性,更精簡
+    'max_output_tokens': 300,  # 進一步限制輸出長度 (500→300)
+    'temperature': 0.2,  # 更低溫度,更精簡 (0.3→0.2)
     
     # 提示詞優化
     'use_concise_prompts': True,  # 使用精簡提示詞
