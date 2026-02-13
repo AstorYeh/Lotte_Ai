@@ -3,9 +3,12 @@ LLM 顧問模組
 使用 Gemini 作為第八個模型維度,提供選號建議
 """
 import json
+import time
 import google.generativeai as genai
 from src.api_key_manager import api_key_manager
 from src.logger import logger
+from src.api_quota_config import API_QUOTA_CONFIG, DAILY_USAGE
+from src.timezone_utils import get_taiwan_now
 import os
 
 class LLMAdvisor:
@@ -13,8 +16,8 @@ class LLMAdvisor:
     
     def __init__(self):
         """初始化 LLM"""
-        # 從 API Key Manager 讀取
-        api_key = api_key_manager.load_api_key("google_gemini")
+        # 使用新的 API Key
+        api_key = API_QUOTA_CONFIG['api_key']
         
         if not api_key:
             api_key = os.getenv("GOOGLE_API_KEY")
@@ -26,11 +29,35 @@ class LLMAdvisor:
         
         try:
             genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel('gemini-2.5-pro')  # Gemini 2.5 Pro
-            logger.info("LLM 顧問已啟用 (Gemini 2.0 Flash)")
+            # 使用免費版模型
+            self.model = genai.GenerativeModel(
+                API_QUOTA_CONFIG['model'],
+                generation_config={
+                    'max_output_tokens': API_QUOTA_CONFIG['max_output_tokens'],
+                    'temperature': API_QUOTA_CONFIG['temperature']
+                }
+            )
+            logger.info(f"LLM 顧問已啟用 ({API_QUOTA_CONFIG['model']})")
         except Exception as e:
             self.model = None
             logger.error(f"LLM 初始化失敗: {e}")
+    
+    def _check_quota(self):
+        """檢查每日配額"""
+        today = get_taiwan_now().strftime('%Y-%m-%d')
+        
+        # 重置每日計數
+        if DAILY_USAGE['date'] != today:
+            DAILY_USAGE['date'] = today
+            DAILY_USAGE['requests'] = 0
+            DAILY_USAGE['tokens_used'] = 0
+        
+        # 檢查是否超過每日限制
+        if DAILY_USAGE['requests'] >= API_QUOTA_CONFIG['daily_limit']:
+            logger.warning(f"已達每日配額限制 ({API_QUOTA_CONFIG['daily_limit']})")
+            return False
+        
+        return True
     
     def get_group_advice(self, group_id, group_range, historical_stats, model_scores):
         """
@@ -52,66 +79,61 @@ class LLMAdvisor:
         if not self.model:
             return None
         
+        # 檢查配額
+        if not self._check_quota():
+            if API_QUOTA_CONFIG['fallback_to_default']:
+                return {
+                    'numbers': [],
+                    'confidence': 0.5,
+                    'reason': '配額已用完'
+                }
+            return None
+        
         try:
+            # 加入延遲以避免超過 RPM
+            time.sleep(API_QUOTA_CONFIG['request_delay'])
+            
             prompt = self._build_prompt(group_id, group_range, historical_stats, model_scores)
             
             response = self.model.generate_content(prompt)
             result = self._parse_response(response.text)
+            
+            # 更新配額使用
+            DAILY_USAGE['requests'] += 1
             
             logger.debug(f"LLM 建議 ({group_id}): {result}")
             return result
             
         except Exception as e:
             logger.error(f"LLM 建議失敗 ({group_id}): {e}")
+            if API_QUOTA_CONFIG['fallback_to_default']:
+                return {
+                    'numbers': [],
+                    'confidence': 0.5,
+                    'reason': f'錯誤: {str(e)[:50]}'
+                }
             return None
     
     def _build_prompt(self, group_id, group_range, historical_stats, model_scores):
-        """建立 LLM prompt"""
+        """建立精簡 LLM prompt"""
         
-        # 格式化模型評分 (取前 5 名)
+        # 只取前 3 名以節省 tokens
         top_scores = {}
         for model_name, scores in model_scores.items():
             if isinstance(scores, dict):
-                sorted_scores = sorted(scores.items(), key=lambda x: float(x[1]) if isinstance(x[1], (int, float, str)) else 0, reverse=True)[:5]
-                top_scores[model_name] = {num: str(score) if isinstance(score, str) else f"{float(score):.2f}" for num, score in sorted_scores}
+                sorted_scores = sorted(scores.items(), key=lambda x: float(x[1]) if isinstance(x[1], (int, float, str)) else 0, reverse=True)[:3]
+                top_scores[model_name] = {num: f"{float(score):.2f}" for num, score in sorted_scores}
         
-        prompt = f"""你是 539 彩券分析專家。請分析以下資料並給出選號建議。
+        # 精簡提示詞
+        prompt = f"""分析 539 彩券 {group_id} ({group_range[0]}-{group_range[1]})。
 
-## 群組資訊
-- 群組: {group_id}
-- 號碼範圍: {group_range[0]}-{group_range[1]}
-- 可選號碼數: 0-3 顆 (動態調整,不強制)
+模型評分(前3):
+{json.dumps(top_scores, ensure_ascii=False)}
 
-## 歷史統計 (最近 30 期)
-{json.dumps(historical_stats, indent=2, ensure_ascii=False)}
+建議0-3個號碼,優先選多模型看好的。
 
-## 七大模型評分 (前 5 名)
-{json.dumps(top_scores, indent=2, ensure_ascii=False)}
-
-## 請回答
-1. 建議選出幾顆號碼? (0-3 顆,根據機率決定)
-2. 具體建議哪些號碼?
-3. 信心度評分 (0-1,小數點後兩位)
-4. 簡短理由 (一句話)
-
-**重要**: 
-- 如果該群組沒有明顯的高機率號碼,可以選 0 顆
-- 不要強制湊數,寧缺勿濫
-- 優先考慮多個模型都看好的號碼
-
-請以 JSON 格式回答:
-{{
-  "numbers": [5, 8],
-  "confidence": 0.78,
-  "reason": "號碼 5 和 8 在頻率與 RSI 模型中都排名前列"
-}}
-
-如果建議選 0 顆,請回答:
-{{
-  "numbers": [],
-  "confidence": 0.5,
-  "reason": "該群組無明顯高機率號碼"
-}}
+JSON格式回答:
+{{"numbers": [5,8], "confidence": 0.78, "reason": "簡短理由"}}
 """
         return prompt
     
