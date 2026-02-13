@@ -1,101 +1,116 @@
 # -*- coding: utf-8 -*-
 """
-AI 分身助手 - 模擬用戶思維的決策顧問
+AI 分身助手 - 模擬用戶思維審查決策
+使用規則引擎,不依賴 LLM
 """
 import json
-import os
 from pathlib import Path
-from typing import Dict
-from google import genai
+from typing import Dict, List
 from src.discord_notifier import DiscordNotifier
 from src.timezone_utils import get_taiwan_isoformat
 
 
 class DigitalTwinAdvisor:
-    """AI 分身 - 模擬用戶思維的決策顧問"""
+    """AI 分身 - 審查預測決策 (規則引擎)"""
     
     def __init__(self):
+        """初始化 AI 分身"""
         self.discord = DiscordNotifier()
-        self.llm_client = self._init_gemini_client()
         self.user_profile = self._load_user_profile()
-    
-    def _init_gemini_client(self):
-        """初始化 Gemini API 客戶端"""
-        api_key = os.getenv('GOOGLE_API_KEY')
-        if not api_key:
-            print("[WARNING] GOOGLE_API_KEY not set, Digital Twin disabled")
-            return None
-        
-        return genai.Client(api_key=api_key)
+        print("[INFO] AI 分身已啟用 (規則引擎模式,不使用 LLM)")
     
     def _load_user_profile(self) -> Dict:
-        """載入用戶思維檔案"""
-        profile_file = Path('config/user_profile.json')
-        if profile_file.exists():
-            with open(profile_file, 'r', encoding='utf-8') as f:
+        """載入用戶檔案"""
+        profile_path = Path('config/user_profile.json')
+        if profile_path.exists():
+            with open(profile_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
-        
-        # 預設檔案
         return {
-            'decision_style': 'analytical',
             'risk_tolerance': 'moderate',
-            'priority': 'long_term_stability'
+            'preferences': {
+                'avoid_consecutive': True,
+                'prefer_balanced': True
+            }
         }
     
-    def review_system_decisions(self, decisions: Dict) -> Dict:
-        """審查系統決策,提供用戶視角的批判性意見"""
-        if not self.llm_client:
-            return {'overall_assessment': 'approve', 'note': 'LLM review skipped'}
+    def review_prediction(self, game: str, prediction: Dict) -> Dict:
+        """
+        審查預測決策 (使用規則引擎)
         
-        try:
-            prompt = f"""
-你是用戶的 AI 分身,現在要審查系統提出的決策建議。
-
-**用戶特質**:
-- 決策風格: {self.user_profile.get('decision_style')}
-- 風險容忍度: {self.user_profile.get('risk_tolerance')}
-- 優先考量: {self.user_profile.get('priority')}
-
-**系統決策**:
-{json.dumps(decisions, indent=2, ensure_ascii=False)}
-
-請以用戶的批判性思維審查:
-
-1. **合理性檢查**: 這些決策符合常識和邏輯嗎?
-2. **風險評估**: 有哪些潛在風險被忽略了?
-3. **替代觀點**: 從不同角度看,有什麼問題?
-4. **改進建議**: 如何讓決策更穩健?
-5. **紅旗警示**: 有什麼需要立即注意的問題?
-
-以 JSON 格式回應:
-{{
-  "overall_assessment": "approve",
-  "strengths": ["優點1", "優點2"],
-  "weaknesses": ["缺點1"],
-  "red_flags": [],
-  "improvement_suggestions": ["建議1"],
-  "final_recommendation": "建議繼續執行"
-}}
-"""
+        Args:
+            game: 遊戲名稱
+            prediction: 預測結果
+        
+        Returns:
+            審查結果
+        """
+        print(f"\n[Digital Twin] Reviewing {game} prediction...")
+        
+        concerns = []
+        suggestions = []
+        risk_level = 'low'
+        
+        # 規則 1: 檢查號碼範圍
+        numbers = prediction.get('numbers', [])
+        max_num = {'539': 39, 'lotto': 49, 'power': 38}
+        if any(n > max_num.get(game, 39) or n < 1 for n in numbers):
+            concerns.append("號碼超出有效範圍")
+            risk_level = 'high'
+        
+        # 規則 2: 檢查重複號碼
+        if len(numbers) != len(set(numbers)):
+            concerns.append("存在重複號碼")
+            risk_level = 'high'
+        
+        # 規則 3: 檢查連續號碼 (用戶偏好)
+        if self.user_profile.get('preferences', {}).get('avoid_consecutive', True):
+            sorted_nums = sorted(numbers)
+            consecutive_count = 0
+            for i in range(len(sorted_nums) - 1):
+                if sorted_nums[i+1] - sorted_nums[i] == 1:
+                    consecutive_count += 1
+            if consecutive_count >= 3:
+                concerns.append(f"包含 {consecutive_count} 組連續號碼")
+                suggestions.append("考慮減少連續號碼")
+                risk_level = 'medium'
+        
+        # 規則 4: 檢查號碼分布
+        if game == '539':
+            # 檢查是否過於集中在某個區間
+            ranges = {'1-10': 0, '11-20': 0, '21-30': 0, '31-39': 0}
+            for n in numbers:
+                if n <= 10: ranges['1-10'] += 1
+                elif n <= 20: ranges['11-20'] += 1
+                elif n <= 30: ranges['21-30'] += 1
+                else: ranges['31-39'] += 1
             
-            response = self.llm_client.generate_content(prompt)
-            
-            # 解析 JSON
-            import re
-            json_match = re.search(r'\{[^}]+\}', response.text, re.DOTALL)
-            if json_match:
-                review = json.loads(json_match.group())
-                return review
-            else:
-                return {'overall_assessment': 'approve', 'note': 'Unable to parse response'}
-                
-        except Exception as e:
-            print(f"[ERROR] Digital Twin review failed: {e}")
-            return {'overall_assessment': 'approve', 'error': str(e)}
+            max_in_range = max(ranges.values())
+            if max_in_range >= 4:
+                concerns.append(f"號碼過於集中在某個區間")
+                suggestions.append("建議分散號碼選擇")
+        
+        # 規則 5: 檢查信心度
+        confidence = prediction.get('confidence', 0)
+        if confidence < 0.3:
+            concerns.append(f"預測信心度過低 ({confidence:.2f})")
+            suggestions.append("建議重新評估預測策略")
+            risk_level = 'medium'
+        
+        result = {
+            'game': game,
+            'concerns': concerns,
+            'suggestions': suggestions,
+            'risk_level': risk_level,
+            'approved': len(concerns) == 0 or risk_level == 'low',
+            'timestamp': get_taiwan_isoformat()
+        }
+        
+        # 發送審查報告
+        self._send_review_report(result)
+        
+        return result
     
     def daily_strategic_review(self, context: Dict) -> Dict:
-        """每日策略性審查"""
-        print("\n[Digital Twin] Starting daily strategic review...")
         
         # 審查系統決策
         review = self.review_system_decisions(context)

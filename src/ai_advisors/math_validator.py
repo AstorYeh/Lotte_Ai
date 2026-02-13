@@ -1,34 +1,29 @@
 # -*- coding: utf-8 -*-
 """
-數學專家助手 - 驗證數據和計算正確性
+數學專家 AI 助手
+負責資料驗證、統計分析、模型驗證
+使用純計算,不依賴 LLM
 """
 import pandas as pd
-import json
-import os
+import numpy as np
 from pathlib import Path
-from typing import Dict, List
-from google import genai
 from src.discord_notifier import DiscordNotifier
 from src.timezone_utils import get_taiwan_isoformat
 
 
 class MathValidator:
-    """數學專家 - 驗證數據和計算正確性"""
+    """數學專家 - 資料驗證與統計分析 (純計算)"""
     
     def __init__(self):
+        """初始化數學驗證器"""
         self.discord = DiscordNotifier()
-        self.llm_client = self._init_gemini_client()
+        self.data_paths = {
+            '539': Path('data/539.csv'),
+            '539_train': Path('data/539_train.csv')
+        }
+        print("[INFO] 數學專家已啟用 (純計算模式,不使用 LLM)")
     
-    def _init_gemini_client(self):
-        """初始化 Gemini API 客戶端"""
-        api_key = os.getenv('GOOGLE_API_KEY')
-        if not api_key:
-            print("[WARNING] GOOGLE_API_KEY not set, Math Validator disabled")
-            return None
-        
-        return genai.Client(api_key=api_key)
-    
-    def check_data_integrity(self, game: str) -> Dict:
+    def check_data_integrity(self, game: str) -> dict:
         """檢查歷史資料的完整性和正確性"""
         try:
             # 讀取歷史資料
