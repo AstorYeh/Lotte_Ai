@@ -28,6 +28,7 @@ venv/
 env/
 ENV/
 .env
+.venv/
 
 # Streamlit
 .streamlit/secrets.toml
@@ -35,6 +36,7 @@ ENV/
 # IDE
 .vscode/
 .idea/
+.python-version
 
 # Custom Data (keep structure but ignore large history if needed, but for now we keep data)
 # logs
@@ -46,5 +48,15 @@ data/backups/
 config/backups/
 training_logs/
 
+# 封存目錄 (不上傳到 GitHub)
+_archived/
+
+# 臨時資料
+data/temp_*/
+data/*.zip
+data/*_backup*.csv
+data/temp_*.csv
+
 # Optional: keep data for the user so they have history on cloud
 # data/
+
