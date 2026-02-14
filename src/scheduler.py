@@ -20,9 +20,11 @@ class AutoScheduler:
     
     def __init__(self, config_path: str = "config/auto_config.json"):
         """初始化排程器"""
+        from src.timezone_utils import TAIWAN_TZ
         self.config_path = Path(config_path)
         self.config = self._load_config()
-        self.scheduler = BlockingScheduler()
+        # 明確設定台灣時區
+        self.scheduler = BlockingScheduler(timezone=TAIWAN_TZ)
         self.discord = DiscordNotifier(config_path)
         
         # 任務執行統計
